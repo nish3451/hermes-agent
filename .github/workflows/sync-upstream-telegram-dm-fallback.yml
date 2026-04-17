@@ -1,0 +1,58 @@
+name: Sync Upstream Telegram DM Fallback
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-telegram-dm-fallback
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out fork main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge upstream main
+        run: |
+          git remote add upstream https://github.com/NousResearch/hermes-agent.git || git remote set-url upstream https://github.com/NousResearch/hermes-agent.git
+          git fetch upstream main
+          git merge --no-edit upstream/main || {
+            echo "Upstream merge conflicted. Manual review needed."
+            exit 1
+          }
+
+      - name: Re-apply Telegram DM fallback if upstream still lacks it
+        run: python .github/scripts/apply_telegram_dm_fallback.py
+
+      - name: Commit sync result
+        run: |
+          if git diff --quiet --exit-code; then
+            echo "No working tree changes to commit"
+            exit 0
+          fi
+          git add gateway/platforms/telegram.py tests/gateway/test_telegram_thread_fallback.py
+          git commit -m "chore(fork): preserve telegram dm fallback"
+
+      - name: Push fork main
+        run: |
+          BEFORE="$(git rev-parse origin/main)"
+          AFTER="$(git rev-parse HEAD)"
+          if [ "$BEFORE" = "$AFTER" ]; then
+            echo "Fork main already up to date"
+            exit 0
+          fi
+          git push origin HEAD:main
