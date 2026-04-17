@@ -132,6 +132,32 @@ def test_forum_general_topic_without_message_thread_id_keeps_thread_context():
     assert event.source.thread_id == "1"
 
 
+def test_dm_without_from_user_falls_back_to_chat_identity():
+    """DM messages without from_user should still keep a usable user identity."""
+    adapter = _make_adapter()
+    message = SimpleNamespace(
+        text="hello from DM",
+        caption=None,
+        chat=SimpleNamespace(
+            id=789,
+            type="private",
+            title=None,
+            full_name="Fallback User",
+        ),
+        from_user=None,
+        message_thread_id=None,
+        reply_to_message=None,
+        message_id=11,
+        date=None,
+    )
+
+    event = adapter._build_message_event(message, msg_type=SimpleNamespace(value="text"))
+
+    assert event.source.chat_type == "dm"
+    assert event.source.user_id == "789"
+    assert event.source.user_name == "Fallback User"
+
+
 @pytest.mark.asyncio
 async def test_send_omits_general_topic_thread_id():
     """Telegram sends to forum General should omit message_thread_id=1."""

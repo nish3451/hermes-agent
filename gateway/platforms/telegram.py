@@ -2826,13 +2826,17 @@ class TelegramAdapter(BasePlatformAdapter):
                             break
                     break
 
+        # Telegram can omit from_user on some DM updates; fall back to the DM chat identity.
+        dm_fallback_user_id = str(chat.id) if chat_type == "dm" else None
+        dm_fallback_user_name = chat.full_name if hasattr(chat, "full_name") and chat_type == "dm" else None
+
         # Build source
         source = self.build_source(
             chat_id=str(chat.id),
             chat_name=chat.title or (chat.full_name if hasattr(chat, "full_name") else None),
             chat_type=chat_type,
-            user_id=str(user.id) if user else None,
-            user_name=user.full_name if user else None,
+            user_id=str(user.id) if user else dm_fallback_user_id,
+            user_name=user.full_name if user else dm_fallback_user_name,
             thread_id=thread_id_str,
             chat_topic=chat_topic,
         )
